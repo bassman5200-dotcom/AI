@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘 뭐 먹지? 8종 점심 메뉴 룰렛</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti for winning celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts Inter & Noto Sans KR -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        /* Pointer tick animation */
+        .pointer-tick {
+            transform-origin: top center;
+            animation: tick 0.1s ease-in-out;
+        }
+
+        @keyframes tick {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(-18deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        /* Glassmorphic card styling */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Glow effects */
+        .glow-orange {
+            box-shadow: 0 0 25px rgba(249, 115, 22, 0.4);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(249, 115, 22, 0.5);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-orange-500 selection:text-white">
+
+    <!-- Top Header -->
+    <header class="w-full glass-panel border-b border-slate-800 sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-orange-500/30">
+                    <i class="fa-solid fa-utensils"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-orange-400 to-red-500">
+                        점심 메뉴 룰렛
+                    </h1>
+                    <p class="text-xs text-slate-400">결정장애 퇴치! 8가지 메뉴 맞춤 돌리기</p>
+                </div>
+            </div>
+
+            <!-- Audio Toggle & Helper controls -->
+            <div class="flex items-center space-x-2">
+                <button id="soundToggleBtn" onclick="toggleSound()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-orange-400"></i>
+                    <span id="soundText" class="hidden sm:inline">효과음 ON</span>
+                </button>
+                <button onclick="openPresetModal()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                    <span class="hidden sm:inline">추천 테마</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-6xl mx-auto w-full px-4 py-6 flex-grow grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        <!-- Left / Top Column: Roulette Wheel Display -->
+        <section class="lg:col-span-7 flex flex-col items-center justify-center glass-panel p-6 sm:p-8 rounded-3xl relative overflow-hidden">
+            
+            <!-- Wheel Container -->
+            <div class="relative w-full max-w-[380px] sm:max-w-[440px] aspect-square flex items-center justify-center my-2">
+                
+                <!-- Pointer / Needle Indicator at Top -->
+                <div id="pointerContainer" class="absolute -top-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+                    <div id="wheelPointer" class="w-8 h-10 bg-gradient-to-b from-amber-400 to-red-600 clip-pointer rounded-t-sm"></div>
+                    <div class="w-4 h-4 bg-red-600 rounded-full -mt-2 border-2 border-amber-300 shadow-md"></div>
+                </div>
+
+                <!-- Glow Background Aura -->
+                <div class="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-500/20 to-amber-500/10 filter blur-xl animate-pulse"></div>
+
+                <!-- Canvas Wheel -->
+                <canvas id="rouletteCanvas" class="w-full h-full rounded-full cursor-pointer shadow-2xl border-4 border-slate-700/80 transition duration-300"></canvas>
+
+                <!-- Center Hub Button -->
+                <button id="centerSpinBtn" onclick="spinWheel()" class="absolute z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 border-4 border-slate-900 shadow-2xl flex flex-col items-center justify-center text-white font-black text-lg hover:scale-105 active:scale-95 transition-transform group">
+                    <span class="text-xs tracking-wider opacity-80 group-hover:opacity-100">CLICK</span>
+                    <span class="text-base sm:text-lg font-black tracking-tight leading-none mt-0.5">돌리기!</span>
+                </button>
+            </div>
+
+            <!-- Big Spin Action Button -->
+            <div class="w-full max-w-md mt-6 flex gap-3">
+                <button id="spinBtn" onclick="spinWheel()" class="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:from-amber-400 hover:to-red-400 text-white font-black text-xl shadow-lg glow-orange transition-all transform active:scale-98 flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-rotate text-2xl"></i>
+                    <span>오늘의 점심 돌리기!</span>
+                </button>
+            </div>
+
+            <p class="text-slate-400 text-xs mt-3 text-center">
+                <i class="fa-regular fa-keyboard"></i> 스페이스바(Space)를 눌러도 돌릴 수 있습니다!
+            </p>
+        </section>
+
+        <!-- Right / Bottom Column: Menu List Editor & Controls -->
+        <section class="lg:col-span-5 space-y-6">
+            
+            <!-- 8 Menu Items Customizer Panel -->
+            <div class="glass-panel p-5 rounded-3xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-orange-400"></i>
+                        <h2 class="font-bold text-slate-100 text-base">메뉴 리스트 (8종)</h2>
+                    </div>
+                    <button onclick="resetToDefault()" class="text-xs text-slate-400 hover:text-orange-400 transition flex items-center gap-1">
+                        <i class="fa-solid fa-rotate-left"></i> 초기화
+                    </button>
+                </div>
+
+                <!-- 8 Input Fields -->
+                <div id="menuInputsContainer" class="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                    <!-- Dynamic Javascript inputs generated here -->
+                </div>
+
+                <div class="pt-2 text-xs text-slate-400 flex items-center justify-between">
+                    <span>* 수정 시 즉시 룰렛판에 반영됩니다.</span>
+                    <button onclick="shuffleMenus()" class="text-orange-400 hover:underline font-medium">
+                        <i class="fa-solid fa-shuffle"></i> 순서 섞기
+                    </button>
+                </div>
+            </div>
+
+            <!-- History Panel -->
+            <div class="glass-panel p-5 rounded-3xl space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+                        <h3 class="font-bold text-slate-100 text-sm">최근 뽑힌 메뉴</h3>
+                    </div>
+                    <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-red-400 transition">
+                        기록 삭제
+                    </button>
+                </div>
+                
+                <div id="historyList" class="flex flex-wrap gap-2 min-h-[40px] items-center">
+                    <span class="text-xs text-slate-500 italic">아직 뽑은 기록이 없습니다.</span>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Win Result Modal -->
+    <div id="resultModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel border border-orange-500/30 w-full max-w-sm rounded-3xl p-6 text-center transform scale-90 transition-transform duration-300 space-y-5 shadow-2xl relative overflow-hidden" id="modalCard">
+            <!-- Decorative header glow -->
+            <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 bg-orange-500/30 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 text-white text-5xl shadow-xl shadow-orange-500/30 animate-bounce">
+                <span id="winEmoji">🍲</span>
+            </div>
+
+            <div>
+                <p class="text-xs font-bold tracking-wider text-orange-400 uppercase mb-1">오늘의 추천 점심 메뉴</p>
+                <h3 id="winMenuTitle" class="text-3xl font-black text-white tracking-tight">김치찌개</h3>
+            </div>
+
+            <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700/50 text-xs text-slate-300 space-y-1">
+                <p id="winQuote">"오늘 점심은 이 메뉴로 맛점하세요!"</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="space-y-2 pt-2">
+                <a id="mapSearchBtn" href="#" target="_blank" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>주변 맛집 검색하기 (네이버 지도)</span>
+                </a>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="closeModal()" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
+                        닫기
+                    </button>
+                    <button onclick="closeModal(); spinWheel();" class="py-2.5 px-4 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-semibold text-xs transition">
+                        다시 돌리기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme Preset Modal -->
+    <div id="presetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl relative">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                    <span>추천 메뉴 테마 선택</span>
+                </h3>
+                <button onclick="closePresetModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
+                <button onclick="applyPreset('default')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">직장인 대중 메뉴 (기본)</div>
+                        <div class="text-xs text-slate-400">찌개, 짜장, 돈까스, 제육, 파스타, 버거, 쌀국수, 샐러드</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
+                </button>
+
+                <button onclick="applyPreset('hangover')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">시원한 해장 메뉴 🍺</div>
+                        <div class="text-xs text-slate-400">콩나물국밥, 짬뽕, 뼈해장국, 평양냉면, 쌀국수, 북엇국, 순대국, 라면</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
+                </button>
+
+                <button onclick="applyPreset('diet')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">건강 & 다이어트 🥗</div>
+                        <div class="text-xs text-slate-400">닭가슴살 샐러드, 연어 포케, 월남쌈, 계란 김밥, 샤브샤브, 샌드위치, 메밀소바, 豆腐유부초밥</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
+                </button>
+
+                <button onclick="applyPreset('snack')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">분식 & 분식 파티 떡볶이 🌶️</div>
+                        <div class="text-xs text-slate-400">떡볶이, 모둠튀김, 참치김밥, 순대, 라면, 우동, 쫄면, 돈까스</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
+                </button>
+
+                <button onclick="applyPreset('quick')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">바쁜 날 패스트푸드 ⚡</div>
+                        <div class="text-xs text-slate-400">수제버거, 삼각김밥&컵라면, 토스트, 서브웨이, 한솥도시락, 핫도그, 맘스터치, 타코</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-800/80">
+        <p>© 2026 점심 메뉴 룰렛 - 맛있는 점심 식사 되세요!</p>
+    </footer>
+
+    <!-- CSS Pointer Clip-path definition -->
+    <style>
+        .clip-pointer {
+            clip-path: polygon(100% 0, 0 0, 50% 100%);
+        }
+    </style>
+
+    <script>
+        // Safe localStorage wrappers to prevent sandboxed SecurityError
+        function safeGetItem(key) {
+            try { return localStorage.getItem(key); }
+            catch (e) { console.warn('localStorage read disabled:', e); return null; }
+        }
+        function safeSetItem(key, val) {
+            try { localStorage.setItem(key, val); }
+            catch (e) { console.warn('localStorage write disabled:', e); }
+        }
+        function safeRemoveItem(key) {
+            try { localStorage.removeItem(key); }
+            catch (e) { console.warn('localStorage delete disabled:', e); }
+        }
+
+        // Default 8 Lunch Items
+        const DEFAULT_MENUS = [
+            { text: "김치찌개", emoji: "🍲", color: "#FF6B6B" },
+            { text: "짜장면/짬뽕", emoji: "🍜", color: "#FF9F43" },
+            { text: "돈까스", emoji: "🍱", color: "#06B6D4" },
+            { text: "제육볶음", emoji: "🥩", color: "#F59E0B" },
+            { text: "파스타", emoji: "🍝", color: "#6366F1" },
+            { text: "수제버거", emoji: "🍔", color: "#EC4899" },
+            { text: "쌀국수", emoji: "🥢", color: "#8B5CF6" },
+            { text: "샐러드/포케", emoji: "🥗", color: "#10B981" }
+        ];
+
+        const PRESETS = {
+            default: DEFAULT_MENUS,
+            hangover: [
+                { text: "콩나물국밥", emoji: "🍲", color: "#FF6B6B" },
+                { text: "해장짬뽕", emoji: "🍜", color: "#FF9F43" },
+                { text: "뼈해장국", emoji: "🥘", color: "#F59E0B" },
+                { text: "평양냉면", emoji: "🧊", color: "#06B6D4" },
+                { text: "소고기쌀국수", emoji: "🥢", color: "#6366F1" },
+                { text: "북엇국", emoji: "🥣", color: "#10B981" },
+                { text: "순대국밥", emoji: "🍲", color: "#8B5CF6" },
+                { text: "해장라면", emoji: "🍜", color: "#EC4899" }
+            ],
+            diet: [
+                { text: "닭가슴살샐러드", emoji: "🥗", color: "#10B981" },
+                { text: "연어포케", emoji: "🥑", color: "#06B6D4" },
+                { text: "월남쌈", emoji: "🥬", color: "#8B5CF6" },
+                { text: "키토김밥", emoji: "🍙", color: "#F59E0B" },
+                { text: "샤브샤브", emoji: "🍲", color: "#FF6B6B" },
+                { text: "호밀샌드위치", emoji: "🥪", color: "#FF9F43" },
+                { text: "메밀소바", emoji: "🍜", color: "#6366F1" },
+                { text: "두부유부초밥", emoji: "🍱", color: "#EC4899" }
+            ],
+            snack: [
+                { text: "국물떡볶이", emoji: "🌶️", color: "#FF6B6B" },
+                { text: "모둠튀김", emoji: "🍤", color: "#FF9F43" },
+                { text: "참치김밥", emoji: "🍙", color: "#F59E0B" },
+                { text: "찹쌀순대", emoji: "🍢", color: "#8B5CF6" },
+                { text: "치즈라면", emoji: "🍜", color: "#06B6D4" },
+                { text: "어묵우동", emoji: "🍥", color: "#6366F1" },
+                { text: "새콤쫄면", emoji: "🍝", color: "#EC4899" },
+                { text: "왕돈까스", emoji: "🥩", color: "#10B981" }
+            ],
+            quick: [
+                { text: "수제버거", emoji: "🍔", color: "#FF9F43" },
+                { text: "삼각김밥&컵라면", emoji: "🍜", color: "#FF6B6B" },
+                { text: "에그토스트", emoji: "🥪", color: "#F59E0B" },
+                { text: "서브웨이", emoji: "🥖", color: "#10B981" },
+                { text: "한솥도시락", emoji: "🍱", color: "#06B6D4" },
+                { text: "치즈핫도그", emoji: "🌭", color: "#6366F1" },
+                { text: "맘스터치", emoji: "🍗", color: "#EC4899" },
+                { text: "멕시칸타코", emoji: "🌮", color: "#8B5CF6" }
+            ]
+        };
+
+        const FUN_QUOTES = [
+            "오늘 점심 메뉴 고민 완료! 맛있게 드세요!",
+            "더 이상 고민은 사치! 오늘의 영양 보충 타임~",
+            "동료들과 함께 이 메뉴로 가보는 건 어떨까요?",
+            "탁월한 선택입니다! 행복한 식사 시간 보내세요.",
+            "오늘의 최고 가성비 & 꿀맛 메뉴 확정!"
+        ];
+
+        // State Variables with safe storage fallback
+        let menus = [];
+        try {
+            const saved = safeGetItem('lunch_roulette_menus');
+            menus = saved ? JSON.parse(saved) : [...DEFAULT_MENUS];
+        } catch(e) {
+            menus = [...DEFAULT_MENUS];
+        }
+
+        let historyList = [];
+        try {
+            const savedHist = safeGetItem('lunch_roulette_history');
+            historyList = savedHist ? JSON.parse(savedHist) : [];
+        } catch(e) {
+            historyList = [];
+        }
+
+        let currentAngle = 0; // In radians
+        let isSpinning = false;
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        // Element references
+        const canvas = document.getElementById('rouletteCanvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+        const wheelPointer = document.getElementById('wheelPointer');
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTickSound() {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.04);
+                
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.04);
+            } catch (e) {
+                // Audio context fallback
+            }
+        }
+
+        function playWinFanfare() {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                initAudio();
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    
+                    const startTime = audioCtx.currentTime + idx * 0.08;
+                    gain.gain.setValueAtTime(0, startTime);
+                    gain.gain.linearRampToValueAtTime(0.2, startTime + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.4);
+                });
+            } catch (e) {
+                // Audio context fallback
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            const text = document.getElementById('soundText');
+            if (soundEnabled) {
+                icon.className = "fa-solid fa-volume-high text-orange-400";
+                text.innerText = "효과음 ON";
+            } else {
+                icon.className = "fa-solid fa-volume-xmark text-slate-500";
+                text.innerText = "효과음 OFF";
+            }
+        }
+
+        function resizeCanvas() {
+            if (!canvas || !canvas.parentElement) return;
+            const container = canvas.parentElement;
+            const size = Math.max(Math.min(container.clientWidth || 360, 500), 200);
+            const dpr = window.devicePixelRatio || 1;
+            
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            if (ctx) {
+                if (ctx.resetTransform) ctx.resetTransform();
+                else ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+            }
+            
+            drawWheel();
+        }
+
+        function drawWheel() {
+            if (!canvas || !ctx) return;
+            const size = canvas.width / (window.devicePixelRatio || 1);
+            const center = size / 2;
+            const radius = Math.max(center - 12, 10);
+            const numSlices = 8;
+            const sliceAngle = (Math.PI * 2) / numSlices;
+
+            ctx.clearRect(0, 0, size, size);
+
+            // Draw outer metallic rim
+            ctx.beginPath();
+            ctx.arc(center, center, radius + 8, 0, Math.PI * 2);
+            ctx.fillStyle = "#1e293b";
+            ctx.fill();
+
+            // Draw Slices
+            for (let i = 0; i < numSlices; i++) {
+                const startAngle = currentAngle + i * sliceAngle;
+                const endAngle = startAngle + sliceAngle;
+                const item = menus[i] || { text: `메뉴 ${i+1}`, color: '#64748b', emoji: '🍽️' };
+
+                // Draw Slice Sector
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, radius, startAngle, endAngle);
+                ctx.closePath();
+
+                // Slice Gradient
+                const gradient = ctx.createRadialGradient(center, center, 10, center, center, radius);
+                gradient.addColorStop(0, item.color || '#f97316');
+                gradient.addColorStop(1, adjustColorBrightness(item.color || '#f97316', -25));
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // Slice border line
+                ctx.strokeStyle = "#0f172a";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Draw Text and Emoji
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(startAngle + sliceAngle / 2);
+
+                const emoji = item.emoji || '🍽️';
+                let displayText = item.text || `메뉴 ${i+1}`;
+                if (displayText.length > 7) {
+                    displayText = displayText.substring(0, 6) + '..';
+                }
+
+                // Draw Emoji (180% enlarged: 28px)
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+                ctx.shadowBlur = 4;
+                ctx.font = "28px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+                ctx.fillText(emoji, radius - 28, -1);
+
+                // Draw Text next to emoji
+                ctx.textAlign = "right";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "#ffffff";
+                ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+                ctx.shadowBlur = 5;
+                ctx.font = "bold 14px 'Noto Sans KR', sans-serif";
+                ctx.fillText(displayText, radius - 52, 0);
+
+                ctx.restore();
+            }
+
+            // Outer golden pins / studs
+            for (let i = 0; i < numSlices; i++) {
+                const pinAngle = currentAngle + i * sliceAngle;
+                const px = center + (radius + 4) * Math.cos(pinAngle);
+                const py = center + (radius + 4) * Math.sin(pinAngle);
+
+                ctx.beginPath();
+                ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+                ctx.fillStyle = "#f59e0b";
+                ctx.fill();
+                ctx.strokeStyle = "#78350f";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Helper to adjust color shade safely
+        function adjustColorBrightness(hex, percent) {
+            try {
+                if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return '#f97316';
+                let num = parseInt(hex.replace('#', ''), 16);
+                if (isNaN(num)) return '#f97316';
+                let amt = Math.round(2.55 * percent),
+                    R = (num >> 16) + amt,
+                    G = (num >> 8 & 0x00FF) + amt,
+                    B = (num & 0x0000FF) + amt;
+                return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+            } catch(e) {
+                return hex || '#f97316';
+            }
+        }
+
+        let lastTickSlice = -1;
+
+        function spinWheel() {
+            if (isSpinning) return;
+            initAudio();
+
+            isSpinning = true;
+            const spinBtn = document.getElementById('spinBtn');
+            const centerSpinBtn = document.getElementById('centerSpinBtn');
+            if (spinBtn) spinBtn.disabled = true;
+            if (centerSpinBtn) centerSpinBtn.disabled = true;
+
+            // Random rotation angle: 5 to 8 full rotations + random angle offset
+            const extraRotations = 5 + Math.floor(Math.random() * 4);
+            const randomTargetAngle = Math.random() * Math.PI * 2;
+            const totalRotation = extraRotations * Math.PI * 2 + randomTargetAngle;
+
+            const startAngle = currentAngle;
+            const targetAngle = startAngle + totalRotation;
+            const duration = 4500; // 4.5s
+            const startTime = performance.now();
+
+            function animateSpin(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Cubic ease-out friction physics curve
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                currentAngle = startAngle + (targetAngle - startAngle) * easeOut;
+
+                // Check pin hit for sound tick and needle bounce
+                const numSlices = 8;
+                const sliceAngle = (Math.PI * 2) / numSlices;
+                
+                // Pointer is fixed at top (270 degrees or -Math.PI/2)
+                const normalizedAngle = (Math.PI * 1.5 - (currentAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                const currentSlice = Math.floor(normalizedAngle / sliceAngle);
+
+                if (currentSlice !== lastTickSlice) {
+                    playTickSound();
+                    triggerNeedleTickAnimation();
+                    lastTickSlice = currentSlice;
+                }
+
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateSpin);
+                } else {
+                    isSpinning = false;
+                    if (spinBtn) spinBtn.disabled = false;
+                    if (centerSpinBtn) centerSpinBtn.disabled = false;
+                    
+                    // Identify winning slice
+                    const winningIndex = currentSlice % numSlices;
+                    const winningItem = menus[winningIndex];
+
+                    onSpinComplete(winningItem);
+                }
+            }
+
+            requestAnimationFrame(animateSpin);
+        }
+
+        function triggerNeedleTickAnimation() {
+            if (!wheelPointer) return;
+            wheelPointer.classList.remove('pointer-tick');
+            void wheelPointer.offsetWidth;
+            wheelPointer.classList.add('pointer-tick');
+        }
+
+        function onSpinComplete(winningItem) {
+            playWinFanfare();
+
+            // Fire Confetti safely if available
+            if (typeof confetti === 'function') {
+                try {
+                    confetti({
+                        particleCount: 80,
+                        spread: 70,
+                        origin: { y: 0.6 }
+                    });
+                } catch(e) { console.warn('Confetti error:', e); }
+            }
+
+            // Save to history
+            addHistory(winningItem);
+
+            // Display Result Modal
+            document.getElementById('winMenuTitle').innerText = winningItem.text;
+            document.getElementById('winEmoji').innerText = winningItem.emoji || '🍲';
+            
+            // Random quote
+            const randomQuote = FUN_QUOTES[Math.floor(Math.random() * FUN_QUOTES.length)];
+            document.getElementById('winQuote').innerText = `"${randomQuote}"`;
+
+            // Naver Map search link
+            const searchQuery = encodeURIComponent(`주변 ${winningItem.text} 맛집`);
+            document.getElementById('mapSearchBtn').href = `https://map.naver.com/v5/search/${searchQuery}`;
+
+            openModal();
+        }
+
+        function renderMenuInputs() {
+            const container = document.getElementById('menuInputsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            menus.forEach((item, idx) => {
+                const row = document.createElement('div');
+                row.className = "flex items-center gap-2 bg-slate-800/60 p-2 rounded-2xl border border-slate-700/50 hover:border-slate-600 transition";
+                row.innerHTML = `
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-sm flex-shrink-0" style="background-color: ${item.color}">
+                        ${idx + 1}
+                    </span>
+                    <input type="text" value="${item.emoji || ''}" maxlength="2" placeholder="😀" 
+                        onchange="updateMenuEmoji(${idx}, this.value)" 
+                        class="w-11 h-11 bg-slate-900 border border-slate-700 text-center rounded-xl text-2xl focus:outline-none focus:border-orange-500">
+                    <input type="text" value="${item.text}" maxlength="12" placeholder="메뉴 이름" 
+                        oninput="updateMenuText(${idx}, this.value)" 
+                        class="flex-1 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-slate-100 focus:outline-none focus:border-orange-500">
+                    <input type="color" value="${item.color}" 
+                        onchange="updateMenuColor(${idx}, this.value)" 
+                        class="w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0 p-0 flex-shrink-0">
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function updateMenuText(index, text) {
+            menus[index].text = text || `메뉴 ${index + 1}`;
+            saveAndDraw();
+        }
+
+        function updateMenuEmoji(index, emoji) {
+            menus[index].emoji = emoji || '🍽️';
+            saveAndDraw();
+        }
+
+        function updateMenuColor(index, color) {
+            menus[index].color = color;
+            saveAndDraw();
+            renderMenuInputs();
+        }
+
+        function shuffleMenus() {
+            menus.sort(() => Math.random() - 0.5);
+            saveAndDraw();
+            renderMenuInputs();
+        }
+
+        function resetToDefault() {
+            menus = JSON.parse(JSON.stringify(DEFAULT_MENUS));
+            saveAndDraw();
+            renderMenuInputs();
+        }
+
+        function applyPreset(presetKey) {
+            if (PRESETS[presetKey]) {
+                menus = JSON.parse(JSON.stringify(PRESETS[presetKey]));
+                saveAndDraw();
+                renderMenuInputs();
+                closePresetModal();
+            }
+        }
+
+        function saveAndDraw() {
+            safeSetItem('lunch_roulette_menus', JSON.stringify(menus));
+            drawWheel();
+        }
+
+        function addHistory(item) {
+            const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+            historyList.unshift({ text: item.text, emoji: item.emoji || '🍲', time: timeStr });
+            if (historyList.length > 10) historyList.pop();
+
+            safeSetItem('lunch_roulette_history', JSON.stringify(historyList));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            if (!container) return;
+            if (historyList.length === 0) {
+                container.innerHTML = `<span class="text-xs text-slate-500 italic">아직 뽑은 기록이 없습니다.</span>`;
+                return;
+            }
+
+            container.innerHTML = historyList.map(h => `
+                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200">
+                    <span class="text-lg">${h.emoji}</span>
+                    <span>${h.text}</span>
+                    <span class="text-[10px] text-slate-500 font-normal">(${h.time})</span>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            historyList = [];
+            safeRemoveItem('lunch_roulette_history');
+            renderHistory();
+        }
+
+        function openModal() {
+            const modal = document.getElementById('resultModal');
+            const card = document.getElementById('modalCard');
+            if (!modal || !card) return;
+            modal.classList.remove('pointer-events-none', 'opacity-0');
+            card.classList.remove('scale-90');
+            card.classList.add('scale-100');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('resultModal');
+            const card = document.getElementById('modalCard');
+            if (!modal || !card) return;
+            modal.classList.add('pointer-events-none', 'opacity-0');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-90');
+        }
+
+        function openPresetModal() {
+            const modal = document.getElementById('presetModal');
+            if (modal) modal.classList.remove('pointer-events-none', 'opacity-0');
+        }
+
+        function closePresetModal() {
+            const modal = document.getElementById('presetModal');
+            if (modal) modal.classList.add('pointer-events-none', 'opacity-0');
+        }
+
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            renderMenuInputs();
+            renderHistory();
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Keyboard Spacebar listener to spin
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && e.target === document.body) {
+                e.preventDefault();
+                spinWheel();
+            }
+        });
+    </script>
+</body>
+</html>
