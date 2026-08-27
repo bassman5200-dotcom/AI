@@ -3,854 +3,596 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘 뭐 먹지? 8종 점심 메뉴 룰렛</title>
-    <!-- Tailwind CSS -->
+    <title>불행의 룰렛</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Canvas Confetti for winning celebration -->
+    <!-- confetti 불꽃놀이 라이브러리 추가 -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <!-- Google Fonts Inter & Noto Sans KR -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Noto Sans KR', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#fff7ed',
-                            100: '#ffedd5',
-                            500: '#f97316',
-                            600: '#ea580c',
-                            700: '#c2410c',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+            background-color: #111827; /* 배경칼라 블랙 (Tailwind gray-900) */
+            color: #f3f4f6;
+        }
+        
+        #wheelContainer {
+            transition: transform 4s cubic-bezier(0.33, 1, 0.68, 1);
         }
 
-        /* Pointer tick animation */
-        .pointer-tick {
-            transform-origin: top center;
-            animation: tick 0.1s ease-in-out;
+        /* 타이틀 글씨 붉은 네온 글로우 및 애니메이션 효과 */
+        @keyframes titleGlow {
+            0%, 100% {
+                text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(220, 38, 38, 0.6), 0 0 30px rgba(185, 28, 28, 0.4);
+            }
+            50% {
+                text-shadow: 0 0 20px rgba(255, 0, 0, 1), 0 0 35px rgba(239, 68, 68, 0.9), 0 0 50px rgba(220, 38, 38, 0.8), 0 0 60px rgba(153, 27, 27, 0.6);
+            }
         }
 
-        @keyframes tick {
-            0% { transform: rotate(0deg); }
-            50% { transform: rotate(-18deg); }
-            100% { transform: rotate(0deg); }
+        @keyframes skullFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-6px) scale(1.15) rotate(-5deg); }
         }
 
-        /* Glassmorphic card styling */
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        @keyframes textShake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-1px, 1px); }
+            50% { transform: translate(1px, -1px); }
+            75% { transform: translate(-1px, -1px); }
         }
 
-        /* Glow effects */
-        .glow-orange {
-            box-shadow: 0 0 25px rgba(249, 115, 22, 0.4);
+        .title-glow-effect {
+            animation: titleGlow 2.5s ease-in-out infinite, textShake 4s ease-in-out infinite;
         }
 
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
+        .skull-anim {
+            display: inline-block;
+            animation: skullFloat 2s ease-in-out infinite;
         }
-        ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
+
+        .skull-anim-delay {
+            display: inline-block;
+            animation: skullFloat 2s ease-in-out 1s infinite;
         }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(249, 115, 22, 0.5);
+
+        /* 스크롤바 커스텀 디자인 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1f2937; /* 어두운 테마 트랙 */
             border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563; /* 어두운 테마 썸 */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        
+        /* 초기 화면 및 항목 박스 크기를 10칸 높이(480px)로 엄격 고정 */
+        #segmentInputs {
+            height: 480px;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-orange-500 selection:text-white">
+<body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- Top Header -->
-    <header class="w-full glass-panel border-b border-slate-800 sticky top-0 z-30">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-orange-500/30">
-                    <i class="fa-solid fa-utensils"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-orange-400 to-red-500">
-                        점심 메뉴 룰렛
-                    </h1>
-                    <p class="text-xs text-slate-400">결정장애 퇴치! 8가지 메뉴 맞춤 돌리기</p>
-                </div>
-            </div>
-
-            <!-- Audio Toggle & Helper controls -->
-            <div class="flex items-center space-x-2">
-                <button id="soundToggleBtn" onclick="toggleSound()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold">
-                    <i id="soundIcon" class="fa-solid fa-volume-high text-orange-400"></i>
-                    <span id="soundText" class="hidden sm:inline">효과음 ON</span>
-                </button>
-                <button onclick="openPresetModal()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-semibold">
-                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
-                    <span class="hidden sm:inline">추천 테마</span>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content Container -->
-    <main class="max-w-6xl mx-auto w-full px-4 py-6 flex-grow grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-        <!-- Left / Top Column: Roulette Wheel Display -->
-        <section class="lg:col-span-7 flex flex-col items-center justify-center glass-panel p-6 sm:p-8 rounded-3xl relative overflow-hidden">
+    <main class="bg-gray-800 rounded-3xl shadow-2xl shadow-black w-full max-w-5xl overflow-hidden flex flex-col md:flex-row border border-gray-700">
+        
+        <!-- 왼쪽: 룰렛 휠 영역 -->
+        <section class="flex-1 p-8 bg-gray-900 border-b md:border-b-0 md:border-r border-gray-700 flex flex-col items-center justify-center relative">
+            <h1 class="text-xl sm:text-2xl lg:text-3xl font-extrabold text-red-500 mb-8 absolute top-8 text-center w-full tracking-wider title-glow-effect flex items-center justify-center gap-2 px-2 flex-wrap">
+                <span class="skull-anim">💀</span>
+                <span>불행의 룰렛</span>
+                <span class="text-sm sm:text-base lg:text-xl font-bold text-red-400 bg-red-950/70 px-3 py-1 rounded-full border border-red-800/80 shadow-inner">
+                    (나만 아니면 돼!!)
+                </span>
+                <span class="skull-anim-delay">💀</span>
+            </h1>
             
-            <!-- Wheel Container -->
-            <div class="relative w-full max-w-[380px] sm:max-w-[440px] aspect-square flex items-center justify-center my-2">
-                
-                <!-- Pointer / Needle Indicator at Top -->
-                <div id="pointerContainer" class="absolute -top-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-                    <div id="wheelPointer" class="w-8 h-10 bg-gradient-to-b from-amber-400 to-red-600 clip-pointer rounded-t-sm"></div>
-                    <div class="w-4 h-4 bg-red-600 rounded-full -mt-2 border-2 border-amber-300 shadow-md"></div>
+            <div class="relative w-full max-w-md aspect-square mt-12 md:mt-0">
+                <!-- 룰렛 화살표 (포인터) -->
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 z-20">
+                    <svg class="w-12 h-12 text-red-500 drop-shadow-md" viewBox="0 0 384 512" fill="currentColor">
+                        <path d="M384 192c0 87.4-117 243-168.3 307.2c-12.3 15.3-35.1 15.3-47.4 0C117 435 0 279.4 0 192C0 86 86 0 192 0S384 86 384 192z"/>
+                    </svg>
                 </div>
-
-                <!-- Glow Background Aura -->
-                <div class="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-500/20 to-amber-500/10 filter blur-xl animate-pulse"></div>
-
-                <!-- Canvas Wheel -->
-                <canvas id="rouletteCanvas" class="w-full h-full rounded-full cursor-pointer shadow-2xl border-4 border-slate-700/80 transition duration-300"></canvas>
-
-                <!-- Center Hub Button -->
-                <button id="centerSpinBtn" onclick="spinWheel()" class="absolute z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 border-4 border-slate-900 shadow-2xl flex flex-col items-center justify-center text-white font-black text-lg hover:scale-105 active:scale-95 transition-transform group">
-                    <span class="text-xs tracking-wider opacity-80 group-hover:opacity-100">CLICK</span>
-                    <span class="text-base sm:text-lg font-black tracking-tight leading-none mt-0.5">돌리기!</span>
+                
+                <!-- 룰렛 캔버스 컨테이너 -->
+                <div id="wheelContainer" class="w-full h-full rounded-full shadow-lg">
+                    <canvas id="wheel" width="500" height="500" class="w-full h-full"></canvas>
+                </div>
+                
+                <!-- 중앙 스핀 버튼 -->
+                <button id="spinBtn" onclick="spinWheel()" disabled
+                    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-24 h-24 bg-gradient-to-tr from-red-600 to-pink-500 rounded-full text-white font-bold text-2xl shadow-lg border-4 border-white transform transition hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center">
+                    SPIN
                 </button>
             </div>
 
-            <!-- Big Spin Action Button -->
-            <div class="w-full max-w-md mt-6 flex gap-3">
-                <button id="spinBtn" onclick="spinWheel()" class="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:from-amber-400 hover:to-red-400 text-white font-black text-xl shadow-lg glow-orange transition-all transform active:scale-98 flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-rotate text-2xl"></i>
-                    <span>오늘의 점심 돌리기!</span>
+            <!-- 룰렛 하단 컨트롤 버튼 (랜덤 섞기 & START) -->
+            <div class="mt-6 flex items-center justify-center gap-3 w-full max-w-md z-10">
+                <button id="shuffleBtn" onclick="shuffleSegments()" disabled
+                    class="flex-1 py-3 px-4 bg-gray-700 hover:bg-gray-600 active:bg-gray-800 text-yellow-400 font-bold rounded-xl border border-yellow-500/30 shadow-lg transform transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span>🔀</span> 순서 섞기
+                </button>
+                <button id="startBtn" onclick="spinWheel()" disabled
+                    class="flex-1 py-3 px-4 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-950/50 border border-red-500 transform transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span>🔥</span> START
                 </button>
             </div>
-
-            <p class="text-slate-400 text-xs mt-3 text-center">
-                <i class="fa-regular fa-keyboard"></i> 스페이스바(Space)를 눌러도 돌릴 수 있습니다!
-            </p>
         </section>
 
-        <!-- Right / Bottom Column: Menu List Editor & Controls -->
-        <section class="lg:col-span-5 space-y-6">
+        <!-- 오른쪽: 설정 패널 -->
+        <section class="w-full md:w-96 p-8 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-200 flex items-center gap-2">
+                    <span>⚙️</span> 룰렛 설정
+                </h2>
+                <button id="resetBtn" onclick="resetRoulette()"
+                    class="px-3 py-1.5 bg-gray-700 hover:bg-red-900/60 active:bg-red-950 text-red-400 hover:text-red-300 font-medium text-xs sm:text-sm rounded-xl border border-red-800/50 shadow transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <span>🔄</span> 초기화
+                </button>
+            </div>
             
-            <!-- 8 Menu Items Customizer Panel -->
-            <div class="glass-panel p-5 rounded-3xl space-y-4">
-                <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-orange-400"></i>
-                        <h2 class="font-bold text-slate-100 text-base">메뉴 리스트 (8종)</h2>
-                    </div>
-                    <button onclick="resetToDefault()" class="text-xs text-slate-400 hover:text-orange-400 transition flex items-center gap-1">
-                        <i class="fa-solid fa-rotate-left"></i> 초기화
-                    </button>
-                </div>
-
-                <!-- 8 Input Fields -->
-                <div id="menuInputsContainer" class="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                    <!-- Dynamic Javascript inputs generated here -->
-                </div>
-
-                <div class="pt-2 text-xs text-slate-400 flex items-center justify-between">
-                    <span>* 수정 시 즉시 룰렛판에 반영됩니다.</span>
-                    <button onclick="shuffleMenus()" class="text-orange-400 hover:underline font-medium">
-                        <i class="fa-solid fa-shuffle"></i> 순서 섞기
-                    </button>
-                </div>
+            <div class="mb-4">
+                <label for="numSegments" class="block text-sm font-medium text-gray-400 mb-2">칸 수 입력 (최대 50개)</label>
+                <input type="number" id="numSegments" min="0" max="50" value="0"
+                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+                    placeholder="원하는 칸 수를 입력하세요">
             </div>
 
-            <!-- History Panel -->
-            <div class="glass-panel p-5 rounded-3xl space-y-3">
-                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
-                        <h3 class="font-bold text-slate-100 text-sm">최근 뽑힌 메뉴</h3>
-                    </div>
-                    <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-red-400 transition">
-                        기록 삭제
-                    </button>
-                </div>
+            <div class="flex-1 flex flex-col min-h-0">
+                <label class="block text-sm font-medium text-gray-400 mb-2">항목 입력</label>
                 
-                <div id="historyList" class="flex flex-wrap gap-2 min-h-[40px] items-center">
-                    <span class="text-xs text-slate-500 italic">아직 뽑은 기록이 없습니다.</span>
+                <!-- 초기 화면부터 10칸 크기로 고정된 입력 박스 컨테이너 -->
+                <div id="segmentInputs" class="overflow-y-auto custom-scrollbar pr-2 space-y-3 pb-2 bg-gray-900/60 rounded-2xl border border-gray-700/60 p-3">
+                    <div class="h-full flex flex-col items-center justify-center text-center text-gray-500 text-sm">
+                        <span class="text-3xl mb-2 opacity-60">🎯</span>
+                        <span>칸 수를 입력하면<br>여기에 입력창이 나타납니다.</span>
+                    </div>
                 </div>
             </div>
-
         </section>
     </main>
 
-    <!-- Win Result Modal -->
-    <div id="resultModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="glass-panel border border-orange-500/30 w-full max-w-sm rounded-3xl p-6 text-center transform scale-90 transition-transform duration-300 space-y-5 shadow-2xl relative overflow-hidden" id="modalCard">
-            <!-- Decorative header glow -->
-            <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 bg-orange-500/30 rounded-full blur-2xl pointer-events-none"></div>
-
-            <div class="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 text-white text-5xl shadow-xl shadow-orange-500/30 animate-bounce">
-                <span id="winEmoji">🍲</span>
-            </div>
-
-            <div>
-                <p class="text-xs font-bold tracking-wider text-orange-400 uppercase mb-1">오늘의 추천 점심 메뉴</p>
-                <h3 id="winMenuTitle" class="text-3xl font-black text-white tracking-tight">김치찌개</h3>
-            </div>
-
-            <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700/50 text-xs text-slate-300 space-y-1">
-                <p id="winQuote">"오늘 점심은 이 메뉴로 맛점하세요!"</p>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="space-y-2 pt-2">
-                <a id="mapSearchBtn" href="#" target="_blank" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-map-location-dot"></i>
-                    <span>주변 맛집 검색하기 (네이버 지도)</span>
-                </a>
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="closeModal()" class="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
-                        닫기
-                    </button>
-                    <button onclick="closeModal(); spinWheel();" class="py-2.5 px-4 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-semibold text-xs transition">
-                        다시 돌리기
-                    </button>
-                </div>
-            </div>
+    <!-- 결과 알림 모달창 -->
+    <div id="resultModal" class="fixed inset-0 bg-black/80 z-50 hidden items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="bg-gray-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-gray-700 transform scale-95 transition-transform duration-300 text-center relative overflow-hidden" id="modalContent">
+            <!-- 데코레이션 요소 -->
+            <div class="absolute -top-10 -left-10 w-24 h-24 bg-red-900 rounded-full mix-blend-screen filter blur-xl opacity-70"></div>
+            <div class="absolute -bottom-10 -right-10 w-24 h-24 bg-purple-900 rounded-full mix-blend-screen filter blur-xl opacity-70"></div>
+            
+            <h3 class="text-xl font-medium text-gray-400 mb-2 relative z-10">☠️ 당첨 결과 ☠️</h3>
+            <p id="winnerText" class="text-4xl font-bold text-red-500 mb-8 relative z-10 break-words">결과</p>
+            <button onclick="closeModal()" class="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition relative z-10">
+                인정하기
+            </button>
         </div>
     </div>
-
-    <!-- Theme Preset Modal -->
-    <div id="presetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="glass-panel w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl relative">
-            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-                <h3 class="font-bold text-white text-base flex items-center gap-2">
-                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
-                    <span>추천 메뉴 테마 선택</span>
-                </h3>
-                <button onclick="closePresetModal()" class="text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <div class="grid grid-cols-1 gap-2.5 max-h-[320px] overflow-y-auto pr-1">
-                <button onclick="applyPreset('default')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">직장인 대중 메뉴 (기본)</div>
-                        <div class="text-xs text-slate-400">찌개, 짜장, 돈까스, 제육, 파스타, 버거, 쌀국수, 샐러드</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
-                </button>
-
-                <button onclick="applyPreset('hangover')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">시원한 해장 메뉴 🍺</div>
-                        <div class="text-xs text-slate-400">콩나물국밥, 짬뽕, 뼈해장국, 평양냉면, 쌀국수, 북엇국, 순대국, 라면</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
-                </button>
-
-                <button onclick="applyPreset('diet')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">건강 & 다이어트 🥗</div>
-                        <div class="text-xs text-slate-400">닭가슴살 샐러드, 연어 포케, 월남쌈, 계란 김밥, 샤브샤브, 샌드위치, 메밀소바, 豆腐유부초밥</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
-                </button>
-
-                <button onclick="applyPreset('snack')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">분식 & 분식 파티 떡볶이 🌶️</div>
-                        <div class="text-xs text-slate-400">떡볶이, 모둠튀김, 참치김밥, 순대, 라면, 우동, 쫄면, 돈까스</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
-                </button>
-
-                <button onclick="applyPreset('quick')" class="p-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-left transition flex items-center justify-between group">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200 group-hover:text-orange-400">바쁜 날 패스트푸드 ⚡</div>
-                        <div class="text-xs text-slate-400">수제버거, 삼각김밥&컵라면, 토스트, 서브웨이, 한솥도시락, 핫도그, 맘스터치, 타코</div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-orange-400"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-800/80">
-        <p>© 2026 점심 메뉴 룰렛 - 맛있는 점심 식사 되세요!</p>
-    </footer>
-
-    <!-- CSS Pointer Clip-path definition -->
-    <style>
-        .clip-pointer {
-            clip-path: polygon(100% 0, 0 0, 50% 100%);
-        }
-    </style>
 
     <script>
-        // Safe localStorage wrappers to prevent sandboxed SecurityError
-        function safeGetItem(key) {
-            try { return localStorage.getItem(key); }
-            catch (e) { console.warn('localStorage read disabled:', e); return null; }
-        }
-        function safeSetItem(key, val) {
-            try { localStorage.setItem(key, val); }
-            catch (e) { console.warn('localStorage write disabled:', e); }
-        }
-        function safeRemoveItem(key) {
-            try { localStorage.removeItem(key); }
-            catch (e) { console.warn('localStorage delete disabled:', e); }
-        }
-
-        // Default 8 Lunch Items
-        const DEFAULT_MENUS = [
-            { text: "김치찌개", emoji: "🍲", color: "#FF6B6B" },
-            { text: "짜장면/짬뽕", emoji: "🍜", color: "#FF9F43" },
-            { text: "돈까스", emoji: "🍱", color: "#06B6D4" },
-            { text: "제육볶음", emoji: "🥩", color: "#F59E0B" },
-            { text: "파스타", emoji: "🍝", color: "#6366F1" },
-            { text: "수제버거", emoji: "🍔", color: "#EC4899" },
-            { text: "쌀국수", emoji: "🥢", color: "#8B5CF6" },
-            { text: "샐러드/포케", emoji: "🥗", color: "#10B981" }
-        ];
-
-        const PRESETS = {
-            default: DEFAULT_MENUS,
-            hangover: [
-                { text: "콩나물국밥", emoji: "🍲", color: "#FF6B6B" },
-                { text: "해장짬뽕", emoji: "🍜", color: "#FF9F43" },
-                { text: "뼈해장국", emoji: "🥘", color: "#F59E0B" },
-                { text: "평양냉면", emoji: "🧊", color: "#06B6D4" },
-                { text: "소고기쌀국수", emoji: "🥢", color: "#6366F1" },
-                { text: "북엇국", emoji: "🥣", color: "#10B981" },
-                { text: "순대국밥", emoji: "🍲", color: "#8B5CF6" },
-                { text: "해장라면", emoji: "🍜", color: "#EC4899" }
-            ],
-            diet: [
-                { text: "닭가슴살샐러드", emoji: "🥗", color: "#10B981" },
-                { text: "연어포케", emoji: "🥑", color: "#06B6D4" },
-                { text: "월남쌈", emoji: "🥬", color: "#8B5CF6" },
-                { text: "키토김밥", emoji: "🍙", color: "#F59E0B" },
-                { text: "샤브샤브", emoji: "🍲", color: "#FF6B6B" },
-                { text: "호밀샌드위치", emoji: "🥪", color: "#FF9F43" },
-                { text: "메밀소바", emoji: "🍜", color: "#6366F1" },
-                { text: "두부유부초밥", emoji: "🍱", color: "#EC4899" }
-            ],
-            snack: [
-                { text: "국물떡볶이", emoji: "🌶️", color: "#FF6B6B" },
-                { text: "모둠튀김", emoji: "🍤", color: "#FF9F43" },
-                { text: "참치김밥", emoji: "🍙", color: "#F59E0B" },
-                { text: "찹쌀순대", emoji: "🍢", color: "#8B5CF6" },
-                { text: "치즈라면", emoji: "🍜", color: "#06B6D4" },
-                { text: "어묵우동", emoji: "🍥", color: "#6366F1" },
-                { text: "새콤쫄면", emoji: "🍝", color: "#EC4899" },
-                { text: "왕돈까스", emoji: "🥩", color: "#10B981" }
-            ],
-            quick: [
-                { text: "수제버거", emoji: "🍔", color: "#FF9F43" },
-                { text: "삼각김밥&컵라면", emoji: "🍜", color: "#FF6B6B" },
-                { text: "에그토스트", emoji: "🥪", color: "#F59E0B" },
-                { text: "서브웨이", emoji: "🥖", color: "#10B981" },
-                { text: "한솥도시락", emoji: "🍱", color: "#06B6D4" },
-                { text: "치즈핫도그", emoji: "🌭", color: "#6366F1" },
-                { text: "맘스터치", emoji: "🍗", color: "#EC4899" },
-                { text: "멕시칸타코", emoji: "🌮", color: "#8B5CF6" }
-            ]
-        };
-
-        const FUN_QUOTES = [
-            "오늘 점심 메뉴 고민 완료! 맛있게 드세요!",
-            "더 이상 고민은 사치! 오늘의 영양 보충 타임~",
-            "동료들과 함께 이 메뉴로 가보는 건 어떨까요?",
-            "탁월한 선택입니다! 행복한 식사 시간 보내세요.",
-            "오늘의 최고 가성비 & 꿀맛 메뉴 확정!"
-        ];
-
-        // State Variables with safe storage fallback
-        let menus = [];
-        try {
-            const saved = safeGetItem('lunch_roulette_menus');
-            menus = saved ? JSON.parse(saved) : [...DEFAULT_MENUS];
-        } catch(e) {
-            menus = [...DEFAULT_MENUS];
-        }
-
-        let historyList = [];
-        try {
-            const savedHist = safeGetItem('lunch_roulette_history');
-            historyList = savedHist ? JSON.parse(savedHist) : [];
-        } catch(e) {
-            historyList = [];
-        }
-
-        let currentAngle = 0; // In radians
+        // 상태 변수
+        let segments = [];
+        let currentRotation = 0;
         let isSpinning = false;
-        let soundEnabled = true;
+        let tickAnimId = null;
+        
+        // Web Audio API 효과음 생성
         let audioCtx = null;
 
-        // Element references
-        const canvas = document.getElementById('rouletteCanvas');
-        const ctx = canvas ? canvas.getContext('2d') : null;
-        const wheelPointer = document.getElementById('wheelPointer');
-
-        function initAudio() {
+        function getAudioContext() {
             if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (AudioContext) audioCtx = new AudioContext();
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-            if (audioCtx && audioCtx.state === 'suspended') {
+            if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
+            return audioCtx;
         }
 
+        // 회전 딸깍음 (Tick Sound)
         function playTickSound() {
-            if (!soundEnabled || !audioCtx) return;
             try {
-                initAudio();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
                 
                 osc.type = 'triangle';
-                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.04);
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.03);
                 
-                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.03);
                 
                 osc.connect(gain);
-                gain.connect(audioCtx.destination);
+                gain.connect(ctx.destination);
                 
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.04);
-            } catch (e) {
-                // Audio context fallback
-            }
+                osc.stop(ctx.currentTime + 0.03);
+            } catch(e) {}
         }
 
-        function playWinFanfare() {
-            if (!soundEnabled || !audioCtx) return;
+        // 당첨(벌칙) 비웃음 효과음 (Mocking Evil Laugh Sound)
+        function playLaughSound() {
             try {
-                initAudio();
-                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-                notes.forEach((freq, idx) => {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    
-                    osc.type = 'sine';
-                    osc.frequency.value = freq;
-                    
-                    const startTime = audioCtx.currentTime + idx * 0.08;
-                    gain.gain.setValueAtTime(0, startTime);
-                    gain.gain.linearRampToValueAtTime(0.2, startTime + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
-                    
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    
-                    osc.start(startTime);
-                    osc.stop(startTime + 0.4);
-                });
-            } catch (e) {
-                // Audio context fallback
-            }
-        }
-
-        function toggleSound() {
-            soundEnabled = !soundEnabled;
-            const icon = document.getElementById('soundIcon');
-            const text = document.getElementById('soundText');
-            if (soundEnabled) {
-                icon.className = "fa-solid fa-volume-high text-orange-400";
-                text.innerText = "효과음 ON";
-            } else {
-                icon.className = "fa-solid fa-volume-xmark text-slate-500";
-                text.innerText = "효과음 OFF";
-            }
-        }
-
-        function resizeCanvas() {
-            if (!canvas || !canvas.parentElement) return;
-            const container = canvas.parentElement;
-            const size = Math.max(Math.min(container.clientWidth || 360, 500), 200);
-            const dpr = window.devicePixelRatio || 1;
-            
-            canvas.width = size * dpr;
-            canvas.height = size * dpr;
-            if (ctx) {
-                if (ctx.resetTransform) ctx.resetTransform();
-                else ctx.setTransform(1, 0, 0, 1, 0, 0);
-                ctx.scale(dpr, dpr);
-            }
-            
-            drawWheel();
-        }
-
-        function drawWheel() {
-            if (!canvas || !ctx) return;
-            const size = canvas.width / (window.devicePixelRatio || 1);
-            const center = size / 2;
-            const radius = Math.max(center - 12, 10);
-            const numSlices = 8;
-            const sliceAngle = (Math.PI * 2) / numSlices;
-
-            ctx.clearRect(0, 0, size, size);
-
-            // Draw outer metallic rim
-            ctx.beginPath();
-            ctx.arc(center, center, radius + 8, 0, Math.PI * 2);
-            ctx.fillStyle = "#1e293b";
-            ctx.fill();
-
-            // Draw Slices
-            for (let i = 0; i < numSlices; i++) {
-                const startAngle = currentAngle + i * sliceAngle;
-                const endAngle = startAngle + sliceAngle;
-                const item = menus[i] || { text: `메뉴 ${i+1}`, color: '#64748b', emoji: '🍽️' };
-
-                // Draw Slice Sector
-                ctx.beginPath();
-                ctx.moveTo(center, center);
-                ctx.arc(center, center, radius, startAngle, endAngle);
-                ctx.closePath();
-
-                // Slice Gradient
-                const gradient = ctx.createRadialGradient(center, center, 10, center, center, radius);
-                gradient.addColorStop(0, item.color || '#f97316');
-                gradient.addColorStop(1, adjustColorBrightness(item.color || '#f97316', -25));
-                ctx.fillStyle = gradient;
-                ctx.fill();
-
-                // Slice border line
-                ctx.strokeStyle = "#0f172a";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-
-                // Draw Text and Emoji
-                ctx.save();
-                ctx.translate(center, center);
-                ctx.rotate(startAngle + sliceAngle / 2);
-
-                const emoji = item.emoji || '🍽️';
-                let displayText = item.text || `메뉴 ${i+1}`;
-                if (displayText.length > 7) {
-                    displayText = displayText.substring(0, 6) + '..';
-                }
-
-                // Draw Emoji (180% enlarged: 28px)
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-                ctx.shadowBlur = 4;
-                ctx.font = "28px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
-                ctx.fillText(emoji, radius - 28, -1);
-
-                // Draw Text next to emoji
-                ctx.textAlign = "right";
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = "#ffffff";
-                ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-                ctx.shadowBlur = 5;
-                ctx.font = "bold 14px 'Noto Sans KR', sans-serif";
-                ctx.fillText(displayText, radius - 52, 0);
-
-                ctx.restore();
-            }
-
-            // Outer golden pins / studs
-            for (let i = 0; i < numSlices; i++) {
-                const pinAngle = currentAngle + i * sliceAngle;
-                const px = center + (radius + 4) * Math.cos(pinAngle);
-                const py = center + (radius + 4) * Math.sin(pinAngle);
-
-                ctx.beginPath();
-                ctx.arc(px, py, 3.5, 0, Math.PI * 2);
-                ctx.fillStyle = "#f59e0b";
-                ctx.fill();
-                ctx.strokeStyle = "#78350f";
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-        }
-
-        // Helper to adjust color shade safely
-        function adjustColorBrightness(hex, percent) {
-            try {
-                if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return '#f97316';
-                let num = parseInt(hex.replace('#', ''), 16);
-                if (isNaN(num)) return '#f97316';
-                let amt = Math.round(2.55 * percent),
-                    R = (num >> 16) + amt,
-                    G = (num >> 8 & 0x00FF) + amt,
-                    B = (num & 0x0000FF) + amt;
-                return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-                    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-                    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
-            } catch(e) {
-                return hex || '#f97316';
-            }
-        }
-
-        let lastTickSlice = -1;
-
-        function spinWheel() {
-            if (isSpinning) return;
-            initAudio();
-
-            isSpinning = true;
-            const spinBtn = document.getElementById('spinBtn');
-            const centerSpinBtn = document.getElementById('centerSpinBtn');
-            if (spinBtn) spinBtn.disabled = true;
-            if (centerSpinBtn) centerSpinBtn.disabled = true;
-
-            // Random rotation angle: 5 to 8 full rotations + random angle offset
-            const extraRotations = 5 + Math.floor(Math.random() * 4);
-            const randomTargetAngle = Math.random() * Math.PI * 2;
-            const totalRotation = extraRotations * Math.PI * 2 + randomTargetAngle;
-
-            const startAngle = currentAngle;
-            const targetAngle = startAngle + totalRotation;
-            const duration = 4500; // 4.5s
-            const startTime = performance.now();
-
-            function animateSpin(now) {
-                const elapsed = now - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-
-                // Cubic ease-out friction physics curve
-                const easeOut = 1 - Math.pow(1 - progress, 3);
-                currentAngle = startAngle + (targetAngle - startAngle) * easeOut;
-
-                // Check pin hit for sound tick and needle bounce
-                const numSlices = 8;
-                const sliceAngle = (Math.PI * 2) / numSlices;
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
                 
-                // Pointer is fixed at top (270 degrees or -Math.PI/2)
-                const normalizedAngle = (Math.PI * 1.5 - (currentAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-                const currentSlice = Math.floor(normalizedAngle / sliceAngle);
+                // 비웃음 "콰하하하하!" 리듬 패턴 (음높이, 시작시간, 지속시간)
+                const laughNotes = [
+                    { time: 0.00, pitch: 360, dur: 0.14 },
+                    { time: 0.16, pitch: 420, dur: 0.14 },
+                    { time: 0.32, pitch: 390, dur: 0.14 },
+                    { time: 0.48, pitch: 350, dur: 0.15 },
+                    { time: 0.65, pitch: 310, dur: 0.18 },
+                    { time: 0.85, pitch: 250, dur: 0.28 },
+                    { time: 1.15, pitch: 190, dur: 0.40 }
+                ];
 
-                if (currentSlice !== lastTickSlice) {
-                    playTickSound();
-                    triggerNeedleTickAnimation();
-                    lastTickSlice = currentSlice;
-                }
-
-                drawWheel();
-
-                if (progress < 1) {
-                    requestAnimationFrame(animateSpin);
-                } else {
-                    isSpinning = false;
-                    if (spinBtn) spinBtn.disabled = false;
-                    if (centerSpinBtn) centerSpinBtn.disabled = false;
+                laughNotes.forEach(note => {
+                    const startTime = now + note.time;
                     
-                    // Identify winning slice
-                    const winningIndex = currentSlice % numSlices;
-                    const winningItem = menus[winningIndex];
+                    // Sawtooth 파형과 서브 옥타브 트라이앵글 오실레이터 조합 (음산하고 얄미운 목소리 톤)
+                    const osc = ctx.createOscillator();
+                    const subOsc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    const filter = ctx.createBiquadFilter();
 
-                    onSpinComplete(winningItem);
-                }
-            }
+                    osc.type = 'sawtooth';
+                    subOsc.type = 'triangle';
 
-            requestAnimationFrame(animateSpin);
+                    // 인간의 목소리(포먼트)와 비슷한 주파수대 필터링
+                    filter.type = 'bandpass';
+                    filter.frequency.setValueAtTime(850, startTime);
+                    filter.Q.setValueAtTime(2.5, startTime);
+
+                    // 피치 급강하 효과 ("하-!" 하고 음이 떨어지는 소리)
+                    osc.frequency.setValueAtTime(note.pitch, startTime);
+                    osc.frequency.exponentialRampToValueAtTime(Math.max(note.pitch * 0.55, 50), startTime + note.dur);
+
+                    subOsc.frequency.setValueAtTime(note.pitch / 2, startTime);
+                    subOsc.frequency.exponentialRampToValueAtTime(Math.max((note.pitch * 0.55) / 2, 25), startTime + note.dur);
+
+                    // 끊어치는 볼륨 엔벨로프 (스타카토 비웃음)
+                    gain.gain.setValueAtTime(0, startTime);
+                    gain.gain.linearRampToValueAtTime(0.35, startTime + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + note.dur);
+
+                    osc.connect(filter);
+                    subOsc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(startTime);
+                    subOsc.start(startTime);
+                    osc.stop(startTime + note.dur);
+                    subOsc.stop(startTime + note.dur);
+                });
+            } catch(e) {}
         }
 
-        function triggerNeedleTickAnimation() {
-            if (!wheelPointer) return;
-            wheelPointer.classList.remove('pointer-tick');
-            void wheelPointer.offsetWidth;
-            wheelPointer.classList.add('pointer-tick');
-        }
+        // DOM 요소
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const wheelContainer = document.getElementById('wheelContainer');
+        const numSegmentsInput = document.getElementById('numSegments');
+        const segmentInputsContainer = document.getElementById('segmentInputs');
+        const spinBtn = document.getElementById('spinBtn');
+        const startBtn = document.getElementById('startBtn');
+        const shuffleBtn = document.getElementById('shuffleBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const modal = document.getElementById('resultModal');
+        const modalContent = document.getElementById('modalContent');
+        const winnerText = document.getElementById('winnerText');
 
-        function onSpinComplete(winningItem) {
-            playWinFanfare();
-
-            // Fire Confetti safely if available
-            if (typeof confetti === 'function') {
-                try {
-                    confetti({
-                        particleCount: 80,
-                        spread: 70,
-                        origin: { y: 0.6 }
-                    });
-                } catch(e) { console.warn('Confetti error:', e); }
-            }
-
-            // Save to history
-            addHistory(winningItem);
-
-            // Display Result Modal
-            document.getElementById('winMenuTitle').innerText = winningItem.text;
-            document.getElementById('winEmoji').innerText = winningItem.emoji || '🍲';
-            
-            // Random quote
-            const randomQuote = FUN_QUOTES[Math.floor(Math.random() * FUN_QUOTES.length)];
-            document.getElementById('winQuote').innerText = `"${randomQuote}"`;
-
-            // Naver Map search link
-            const searchQuery = encodeURIComponent(`주변 ${winningItem.text} 맛집`);
-            document.getElementById('mapSearchBtn').href = `https://map.naver.com/v5/search/${searchQuery}`;
-
-            openModal();
-        }
-
-        function renderMenuInputs() {
-            const container = document.getElementById('menuInputsContainer');
-            if (!container) return;
-            container.innerHTML = '';
-
-            menus.forEach((item, idx) => {
-                const row = document.createElement('div');
-                row.className = "flex items-center gap-2 bg-slate-800/60 p-2 rounded-2xl border border-slate-700/50 hover:border-slate-600 transition";
-                row.innerHTML = `
-                    <span class="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-sm flex-shrink-0" style="background-color: ${item.color}">
-                        ${idx + 1}
-                    </span>
-                    <input type="text" value="${item.emoji || ''}" maxlength="2" placeholder="😀" 
-                        onchange="updateMenuEmoji(${idx}, this.value)" 
-                        class="w-11 h-11 bg-slate-900 border border-slate-700 text-center rounded-xl text-2xl focus:outline-none focus:border-orange-500">
-                    <input type="text" value="${item.text}" maxlength="12" placeholder="메뉴 이름" 
-                        oninput="updateMenuText(${idx}, this.value)" 
-                        class="flex-1 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-slate-100 focus:outline-none focus:border-orange-500">
-                    <input type="color" value="${item.color}" 
-                        onchange="updateMenuColor(${idx}, this.value)" 
-                        class="w-7 h-7 rounded-lg cursor-pointer bg-transparent border-0 p-0 flex-shrink-0">
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        function updateMenuText(index, text) {
-            menus[index].text = text || `메뉴 ${index + 1}`;
-            saveAndDraw();
-        }
-
-        function updateMenuEmoji(index, emoji) {
-            menus[index].emoji = emoji || '🍽️';
-            saveAndDraw();
-        }
-
-        function updateMenuColor(index, color) {
-            menus[index].color = color;
-            saveAndDraw();
-            renderMenuInputs();
-        }
-
-        function shuffleMenus() {
-            menus.sort(() => Math.random() - 0.5);
-            saveAndDraw();
-            renderMenuInputs();
-        }
-
-        function resetToDefault() {
-            menus = JSON.parse(JSON.stringify(DEFAULT_MENUS));
-            saveAndDraw();
-            renderMenuInputs();
-        }
-
-        function applyPreset(presetKey) {
-            if (PRESETS[presetKey]) {
-                menus = JSON.parse(JSON.stringify(PRESETS[presetKey]));
-                saveAndDraw();
-                renderMenuInputs();
-                closePresetModal();
-            }
-        }
-
-        function saveAndDraw() {
-            safeSetItem('lunch_roulette_menus', JSON.stringify(menus));
+        // 초기화
+        window.onload = () => {
             drawWheel();
+            numSegmentsInput.addEventListener('input', handleCountChange);
+        };
+
+        function updateButtonStates() {
+            const isDisabled = segments.length === 0 || isSpinning;
+            spinBtn.disabled = isDisabled;
+            startBtn.disabled = isDisabled;
+            shuffleBtn.disabled = segments.length <= 1 || isSpinning;
+            if (resetBtn) resetBtn.disabled = isSpinning;
         }
 
-        function addHistory(item) {
-            const timeStr = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-            historyList.unshift({ text: item.text, emoji: item.emoji || '🍲', time: timeStr });
-            if (historyList.length > 10) historyList.pop();
-
-            safeSetItem('lunch_roulette_history', JSON.stringify(historyList));
-            renderHistory();
+        function resetRoulette() {
+            if (isSpinning) return;
+            getAudioContext();
+            
+            segments = [];
+            currentRotation = 0;
+            wheelContainer.style.transform = `rotate(0deg)`;
+            numSegmentsInput.value = 0;
+            
+            renderInputs();
+            drawWheel();
+            updateButtonStates();
+            playTickSound();
         }
 
-        function renderHistory() {
-            const container = document.getElementById('historyList');
-            if (!container) return;
-            if (historyList.length === 0) {
-                container.innerHTML = `<span class="text-xs text-slate-500 italic">아직 뽑은 기록이 없습니다.</span>`;
+        function handleCountChange(e) {
+            if (isSpinning) return; // 회전 중에는 변경 불가
+            
+            let count = parseInt(e.target.value) || 0;
+            // 안전을 위해 최대값 제한
+            if (count > 50) {
+                count = 50;
+                e.target.value = 50;
+            }
+
+            if (count === 0) {
+                segments = [];
+            } else {
+                const newSegments = [];
+                for (let i = 0; i < count; i++) {
+                    // 기존에 입력된 값이 있으면 유지, 없으면 기본값 할당
+                    newSegments.push(segments[i] !== undefined ? segments[i] : `항목 ${i + 1}`);
+                }
+                segments = newSegments;
+            }
+
+            renderInputs();
+            drawWheel();
+            updateButtonStates();
+        }
+
+        function shuffleSegments() {
+            if (isSpinning || segments.length <= 1) return;
+            getAudioContext();
+            
+            // Fisher-Yates 랜덤 셔플
+            for (let i = segments.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [segments[i], segments[j]] = [segments[j], segments[i]];
+            }
+
+            renderInputs();
+            drawWheel();
+            playTickSound();
+        }
+
+        function renderInputs() {
+            segmentInputsContainer.innerHTML = '';
+            
+            if (segments.length === 0) {
+                segmentInputsContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-center text-gray-500 text-sm"><span class="text-3xl mb-2 opacity-60">🎯</span><span>칸 수를 입력하면<br>여기에 입력창이 나타납니다.</span></div>';
                 return;
             }
 
-            container.innerHTML = historyList.map(h => `
-                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200">
-                    <span class="text-lg">${h.emoji}</span>
-                    <span>${h.text}</span>
-                    <span class="text-[10px] text-slate-500 font-normal">(${h.time})</span>
-                </div>
-            `).join('');
+            segments.forEach((seg, i) => {
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'flex items-center space-x-2';
+                
+                const label = document.createElement('span');
+                label.className = 'w-6 text-center text-sm font-bold text-gray-400';
+                label.textContent = i + 1;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = seg;
+                // 포커스/입력 시 테두리가 노란색으로 표시되도록 스타일 변경
+                input.className = 'flex-1 px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 text-sm transition focus:bg-gray-600';
+                
+                // 입력 값이 바뀔 때마다 캔버스 실시간 렌더링
+                input.oninput = (e) => {
+                    segments[i] = e.target.value;
+                    drawWheel();
+                };
+
+                inputGroup.appendChild(label);
+                inputGroup.appendChild(input);
+                segmentInputsContainer.appendChild(inputGroup);
+            });
         }
 
-        function clearHistory() {
-            historyList = [];
-            safeRemoveItem('lunch_roulette_history');
-            renderHistory();
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 245; // 경계를 벗어나지 않게 여백 조정
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 항목이 0개일 때 (빈 원형)
+            if (segments.length === 0) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#374151'; // gray-700
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#4b5563'; // gray-600
+                ctx.stroke();
+                
+                // 중앙 원
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 55, 0, 2 * Math.PI);
+                ctx.fillStyle = '#1f2937'; // gray-800
+                ctx.fill();
+                return;
+            }
+
+            // 항목이 있을 때 칸 그리기
+            const sliceAngle = (2 * Math.PI) / segments.length;
+
+            for (let i = 0; i < segments.length; i++) {
+                // 부채꼴 그리기
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, i * sliceAngle, (i + 1) * sliceAngle);
+                
+                // 색상 생성 (어두운 테마에 맞춰 명도 낮춤)
+                const hue = (i * 360) / segments.length;
+                ctx.fillStyle = `hsl(${hue}, 70%, 45%)`;
+                ctx.fill();
+                
+                // 칸 경계선
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1f2937'; // 테두리를 어둡게
+                ctx.stroke();
+
+                // 텍스트 그리기
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                // 해당 칸의 중간 각도로 회전
+                ctx.rotate(i * sliceAngle + sliceAngle / 2);
+                
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                
+                // 글자 수나 칸 수에 맞춰 폰트 크기 동적 조절
+                const fontSize = segments.length > 20 ? 14 : segments.length > 10 ? 18 : 24;
+                ctx.font = `bold ${fontSize}px 'Noto Sans KR', sans-serif`;
+                
+                // 텍스트 그림자 효과 (가독성 향상)
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+
+                // 텍스트 렌더링 (경계 끝부분에서 조금 띄움, 너비 제한 설정)
+                ctx.fillText(segments[i], radius - 25, 0, radius - 80);
+                
+                ctx.restore();
+            }
+
+            // 중앙 원 (스핀 버튼이 들어갈 공간 확보)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 55, 0, 2 * Math.PI);
+            ctx.fillStyle = '#1f2937'; // 어두운 색상
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#374151';
+            ctx.stroke();
         }
 
-        function openModal() {
-            const modal = document.getElementById('resultModal');
-            const card = document.getElementById('modalCard');
-            if (!modal || !card) return;
-            modal.classList.remove('pointer-events-none', 'opacity-0');
-            card.classList.remove('scale-90');
-            card.classList.add('scale-100');
+        function spinWheel() {
+            if (segments.length === 0 || isSpinning) return;
+            getAudioContext();
+            
+            isSpinning = true;
+            numSegmentsInput.disabled = true;
+            updateButtonStates();
+
+            // 추가 회전: 기본 4바퀴(1440도) ~ 7바퀴 + 랜덤 각도
+            const randomSpins = 4 + Math.floor(Math.random() * 4);
+            const randomAngle = Math.floor(Math.random() * 360);
+            const targetAddedRotation = (randomSpins * 360) + randomAngle;
+
+            currentRotation += targetAddedRotation;
+
+            // CSS 트랜지션 적용하여 회전
+            wheelContainer.style.transform = `rotate(${currentRotation}deg)`;
+
+            // 회전 시 실시간 효과음(Tick) 감지
+            let prevRawAngle = 0;
+            const sliceDeg = 360 / segments.length;
+
+            function checkTick() {
+                if (!isSpinning) return;
+                const st = window.getComputedStyle(wheelContainer);
+                const tr = st.getPropertyValue("transform");
+                if (tr && tr !== 'none') {
+                    const values = tr.split('(')[1].split(')')[0].split(',');
+                    const a = parseFloat(values[0]);
+                    const b = parseFloat(values[1]);
+                    let deg = Math.atan2(b, a) * (180 / Math.PI);
+                    if (deg < 0) deg += 360;
+
+                    const delta = Math.abs(deg - prevRawAngle);
+                    const normalizedDelta = delta > 180 ? 360 - delta : delta;
+
+                    if (normalizedDelta >= sliceDeg) {
+                        playTickSound();
+                        prevRawAngle = deg;
+                    }
+                }
+                tickAnimId = requestAnimationFrame(checkTick);
+            }
+            checkTick();
+
+            // 애니메이션이 끝난 후(4초) 결과 계산
+            setTimeout(() => {
+                isSpinning = false;
+                if (tickAnimId) cancelAnimationFrame(tickAnimId);
+                numSegmentsInput.disabled = false;
+                updateButtonStates();
+                calculateWinner();
+            }, 4050); // 트랜지션 4초 + 버퍼 50ms
+        }
+
+        function calculateWinner() {
+            // 회전값을 360 내의 양수로 정규화
+            const normalizedRotation = currentRotation % 360;
+            
+            // 캔버스 구조상 0도는 3시 방향. 포인터는 12시 방향(-90도 또는 270도 위치).
+            // 룰렛이 시계방향으로 normalizedRotation만큼 돌았을 때, 12시에 위치하는 칸을 역추적.
+            const topLocalAngle = (270 - normalizedRotation + 360) % 360;
+            
+            const sliceAngleDeg = 360 / segments.length;
+            const winnerIndex = Math.floor(topLocalAngle / sliceAngleDeg);
+            
+            const winner = segments[winnerIndex];
+            showModal(winner);
+        }
+
+        function showModal(winner) {
+            winnerText.textContent = winner;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // 비웃음 효과음 & 불꽃놀이 효과 실행
+            playLaughSound();
+            fireworks();
+            
+            // 약간의 딜레이를 주어 transition(opacity, scale) 적용
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
         }
 
         function closeModal() {
-            const modal = document.getElementById('resultModal');
-            const card = document.getElementById('modalCard');
-            if (!modal || !card) return;
-            modal.classList.add('pointer-events-none', 'opacity-0');
-            card.classList.remove('scale-100');
-            card.classList.add('scale-90');
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300); // transition duration과 맞춤
         }
 
-        function openPresetModal() {
-            const modal = document.getElementById('presetModal');
-            if (modal) modal.classList.remove('pointer-events-none', 'opacity-0');
-        }
+        // 불꽃놀이 효과 함수 (canvas-confetti)
+        function fireworks() {
+            const duration = 3 * 1000;
+            const animationEnd = Date.now() + duration;
+            const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 60 };
 
-        function closePresetModal() {
-            const modal = document.getElementById('presetModal');
-            if (modal) modal.classList.add('pointer-events-none', 'opacity-0');
-        }
-
-        window.addEventListener('load', () => {
-            resizeCanvas();
-            renderMenuInputs();
-            renderHistory();
-        });
-
-        window.addEventListener('resize', resizeCanvas);
-
-        // Keyboard Spacebar listener to spin
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && e.target === document.body) {
-                e.preventDefault();
-                spinWheel();
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
             }
-        });
+
+            const interval = setInterval(function() {
+                const timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+
+                const particleCount = 50 * (timeLeft / duration);
+                // 양쪽 끝에서 불꽃 터지기
+                confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }, 250);
+        }
     </script>
 </body>
 </html>
